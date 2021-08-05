@@ -16,7 +16,7 @@ be used to populate arguments based on the `param` type in main.go. Notably,
 The string '{{.Basename}}' will be replaced with the name of the file. For example,
 to run `ocamlformat` on all OCaml (.ml, .mli) files, execute
 
-	acme-autoformat -r '.mli?$' -- ocamlformat --name='{{.Basename}}' --enable-outside-detected-project -
+	acme-autoformat -r '\.mli?$' -- ocamlformat --name='{{.Basename}}' --enable-outside-detected-project -
 
 The formatter command must accept the content of the file to format on standard
 input, and write the formatted content to standard output. The command will be run
