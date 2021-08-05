@@ -1,0 +1,26 @@
+acme-autoformat runs a code formatter whenever Put is executed on a matching
+Acme window.
+
+INSTALL
+
+go get github.com/droyo/acme-autoformat
+
+RUN
+
+From within acme, run
+
+	acme-autoformat [-r pattern] -- command ...
+
+Within command, the template language from Go's text/template library can
+be used to populate arguments based on the `param` type in main.go. Notably,
+The string '{{.Basename}}' will be replaced with the name of the file. For example,
+to run `ocamlformat` on all OCaml (.ml, .mli) files, execute
+
+	acme-autoformat -r '.mli?$' -- ocamlformat --name='{{.Basename}}' --enable-outside-detected-project -
+
+The formatter command must accept the content of the file to format on standard
+input, and write the formatted content to standard output. The command will be run
+from the same directory that the matching file is located in.
+
+acme-autoformat expects the command `diff` to exist in its PATH, and to accept the
+`-u` flag to generate a unified diff.
