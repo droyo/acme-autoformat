@@ -19,8 +19,8 @@ to run `ocamlformat` on all OCaml (.ml, .mli) files, execute
 	acme-autoformat -r '\.mli?$' -- ocamlformat --name='{{.Basename}}' --enable-outside-detected-project -
 
 The formatter command must accept the content of the file to format on standard
-input, and write the formatted content to standard output. The command will be run
-from the same directory that the matching file is located in.
+input, and write the formatted content to standard output. If the formatter fails, any
+errors are written to an +Errors window sharing the same prefix as the file.
 
 acme-autoformat expects the command `diff` to exist in its PATH, and to accept the
 `-u` flag to generate a unified diff.
