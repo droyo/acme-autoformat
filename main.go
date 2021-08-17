@@ -6,6 +6,7 @@ import (
 	"flag"
 	"io"
 	"log"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -92,30 +93,41 @@ func autoFormat(id int, name string, args []string) {
 	defer w.CloseFiles()
 
 	format := exec.Command(args[0], args[1:]...)
-	diff := exec.Command("diff", "-u", filepath.Base(name), "-")
+	diff := exec.Command("diff", "-u", "/dev/fd/3", "/dev/fd/0")
 
 	body, err := w.ReadAll("body")
 	if err != nil {
 		log.Fatal(err)
 	}
-	format.Stdin = bytes.NewReader(body)
-	diff.Stdin, _ = format.StdoutPipe()
+	rbody, wbody, err := os.Pipe()
+	if err != nil {
+		log.Fatal(err)
+	}
+	go func() {
+		io.Copy(wbody, bytes.NewReader(body))
+		wbody.Close()
+	}()
 
-	diff.Dir = filepath.Dir(name)
-	format.Dir = filepath.Dir(name)
+	// Get formatter/diff errors to show up in a window sharing
+	// the file's path, so addresses in the errors can be plumbed
+	w.SetErrorPrefix(name)
+
+	diff.Stdin, _ = format.StdoutPipe()
+	diff.ExtraFiles = append(diff.ExtraFiles, rbody)
+
+	format.Stdin = bytes.NewReader(body)
 	format.Stderr = &fmtErrBuf
 
 	if err := format.Start(); err != nil {
 		log.Fatal(err)
 	}
-	log.Print("started ", format.Args)
 	go func() {
 		if err := format.Wait(); err != nil {
 			if _, ok := err.(*exec.ExitError); ok {
-				log.Print(format.Args)
-				log.Print(fmtErrBuf.String())
+				w.Err(strings.Join(format.Args, " "))
+				w.Err(fmtErrBuf.String())
 			} else {
-				log.Print(err)
+				w.Err(err.Error())
 			}
 		}
 	}()
@@ -123,17 +135,16 @@ func autoFormat(id int, name string, args []string) {
 	output, err := diff.CombinedOutput()
 	if err != nil {
 		if exit, ok := err.(*exec.ExitError); ok {
-
 			// From diff(1): Exit status is 0 if inputs are the same, 1 if different, 2 if trouble.
 			switch exit.ExitCode() {
 			case 1:
 				applyPatch(bytes.NewReader(output), w)
 			default:
-				log.Println(diff.Args)
-				log.Printf("%s", output)
+				w.Err(strings.Join(diff.Args, " "))
+				w.Err(string(output))
 			}
 		} else {
-			log.Print(err)
+			w.Err(err.Error())
 		}
 	}
 }
@@ -172,6 +183,8 @@ func applyPatch(patch io.Reader, w *acme.Win) {
 			w.Write("data", scanner.Bytes()[1:])
 			// scanner does not include the delimiting newlines.
 			w.Write("data", []byte("\n"))
+		case strings.HasPrefix(line, `\\`):
+			continue
 		case line == "":
 			w.Write("data", nil)
 		default:
